@@ -25,6 +25,20 @@ npm install
 npm run dev
 ```
 
+
+## Environment Variables
+Create a `.env.local` for production-like backend controls:
+
+```bash
+# Optional: enables admin protection for write endpoints when set
+ADMIN_API_KEY=your-secure-admin-key
+
+# Optional: marks DB as configured in health status (future DB adapter hook)
+DATABASE_URL=postgres://...
+```
+
+When `ADMIN_API_KEY` is set, all mutation routes require `x-admin-key` header.
+
 ## Deploy to Vercel
 1. Push this repository to GitHub.
 2. Import the repository in Vercel.
@@ -36,7 +50,7 @@ Recommended production settings:
 - Node.js runtime: default Vercel runtime for Next.js 14.
 - Build command: `npm run build`
 - Install command: `npm install`
-- Health check endpoint after deploy: `/api/health`
+- Health check endpoint after deploy: `/api/health` (returns backend storage/auth readiness metadata).
 
 ### If Vercel build fails
 - Deprecation warnings during install are usually **non-blocking**.
