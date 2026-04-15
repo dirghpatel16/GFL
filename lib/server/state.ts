@@ -1,4 +1,4 @@
-import { AuctionPlayer, Captain, Team, Tournament, Announcement } from "@/lib/types/models";
+import { AuctionPlayer, Captain, Team, Tournament, Announcement, User } from "@/lib/types/models";
 import { initializeAuction, startReveal, beginSelection, lockPick, proceedToNext, AuctionRuntime } from "@/lib/services/auction";
 
 const tournament: Tournament = {
@@ -13,12 +13,17 @@ const tournament: Tournament = {
   format: "3 captains draft auction players"
 };
 
+interface RuntimeUser extends User {
+  password: string;
+}
+
 interface RuntimeState {
   captains: Captain[];
   players: AuctionPlayer[];
   teams: Team[];
   announcements: Announcement[];
   auction: AuctionRuntime;
+  users: RuntimeUser[];
 }
 
 const state: RuntimeState = {
@@ -26,7 +31,8 @@ const state: RuntimeState = {
   players: [],
   teams: [],
   announcements: [],
-  auction: initializeAuction([], [])
+  auction: initializeAuction([], []),
+  users: []
 };
 
 function rebuildAuction() {
@@ -95,4 +101,38 @@ export function auctionAction(action: "start_reveal" | "open_selection" | "pick"
   if (action === "reset") rebuildAuction();
 
   return state.auction;
+}
+
+export function signupUser(username: string, email: string, password: string) {
+  if (state.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
+    return { error: "Email already registered" as const };
+  }
+
+  const user: RuntimeUser = {
+    id: crypto.randomUUID(),
+    username,
+    email,
+    password,
+    emailVerified: false,
+    role: "player",
+    createdAt: new Date().toISOString()
+  };
+
+  state.users.push(user);
+  const { password: _password, ...safeUser } = user;
+  return { user: safeUser };
+}
+
+export function loginUser(email: string, password: string) {
+  const user = state.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  if (!user || user.password !== password) {
+    return { error: "Invalid credentials" as const };
+  }
+
+  const { password: _password, ...safeUser } = user;
+  return { user: { ...safeUser, emailVerified: true } };
+}
+
+export function hasUser(email: string) {
+  return state.users.some((u) => u.email.toLowerCase() === email.toLowerCase());
 }
