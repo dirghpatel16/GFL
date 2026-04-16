@@ -172,6 +172,31 @@ export function getPayment(userId: string) {
   return state.payments[userId] ?? { status: "unpaid", updatedAt: new Date().toISOString() };
 }
 
+
+export function setPaymentStatus(userId: string, status: "unpaid" | "submitted" | "confirmed") {
+  const existing = state.payments[userId] ?? { updatedAt: new Date().toISOString() };
+  state.payments[userId] = { ...existing, status, updatedAt: new Date().toISOString() };
+  return state.payments[userId];
+}
+
+export function getPaymentSubmissions(search = "") {
+  const keyword = search.trim().toLowerCase();
+  const rows = Object.entries(state.payments).map(([userId, payment]) => {
+    const user = state.users.find((u) => u.id === userId);
+    return {
+      user_id: userId,
+      username: user?.username ?? "Unknown",
+      status: payment.status,
+      payer_name: payment.payerName,
+      utr: payment.utr,
+      screenshot_name: payment.screenshotName,
+      updated_at: payment.updatedAt
+    };
+  });
+  if (!keyword) return rows;
+  return rows.filter((r) => `${r.username} ${r.payer_name ?? ""} ${r.utr ?? ""}`.toLowerCase().includes(keyword));
+}
+
 export function addMatchResult(payload: Omit<MatchResult, "id" | "createdAt">) {
   const row: MatchResult = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...payload };
   state.results.unshift(row);

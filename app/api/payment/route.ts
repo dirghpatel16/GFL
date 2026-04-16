@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { asNonEmptyString, badRequest, parseJSON } from "@/lib/server/auth";
-import { getPayment, setPayment, verifyPayment } from "@/lib/server/state";
+import { getPayment, setPayment, setPaymentStatus, verifyPayment } from "@/lib/server/state";
 import { isSupabaseConfigured, supabaseAdminTable } from "@/lib/supabase/rest";
 import { requireCommissionerRequest } from "@/lib/auth/commissioner";
 
@@ -60,10 +60,7 @@ export async function PATCH(req: NextRequest) {
   const nextStatus = action === "reject" ? "unpaid" : "confirmed";
 
   if (!isSupabaseConfigured()) {
-    const payment = action === "reject"
-      ? setPayment(userId, { utr: "", payerName: "" })
-      : verifyPayment(userId);
-    if (action === "reject") payment.status = "unpaid";
+    const payment = action === "reject" ? setPaymentStatus(userId, "unpaid") : verifyPayment(userId);
     return NextResponse.json({ payment: { ...payment, label: label(payment.status) } });
   }
 

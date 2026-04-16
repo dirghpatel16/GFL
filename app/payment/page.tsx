@@ -43,8 +43,9 @@ export default function PaymentPage() {
         <div>
           <p className="eyebrow">Scan & Pay</p>
           <p className="mt-2 text-sm text-white/75">Entry fee is <strong>₹{seasonConfig.entryFee}</strong>.</p>
-          <img src={process.env.NEXT_PUBLIC_PAYMENT_QR_URL || "https://dummyimage.com/600x600/111/00ffe0&text=PlayGFL+Season+2+QR"} alt="PlayGFL Season 2 payment QR code" className="mt-4 w-full max-w-sm rounded-xl border border-white/20" />
+          <img src={process.env.NEXT_PUBLIC_PAYMENT_QR_URL || "/payment-qr.svg"} alt="PlayGFL Season 2 payment QR code" className="mt-4 w-full max-w-sm rounded-xl border border-white/20" />
           {process.env.NEXT_PUBLIC_UPI_ID && <p className="mt-3 text-sm text-white/80">UPI ID: <strong>{process.env.NEXT_PUBLIC_UPI_ID}</strong></p>}
+          <p className="mt-2 text-[11px] text-white/50">Using `public/payment-qr.svg` by default; replace with your provided QR image if needed.</p>
           <ol className="mt-3 space-y-1 text-xs text-white/65">
             <li>1) Open any UPI app and scan the QR code.</li>
             <li>2) Pay exactly ₹{seasonConfig.entryFee}.</li>

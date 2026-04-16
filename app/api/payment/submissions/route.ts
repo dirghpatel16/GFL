@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCommissionerRequest } from "@/lib/auth/commissioner";
 import { isSupabaseConfigured, supabaseAdminTable } from "@/lib/supabase/rest";
+import { getPaymentSubmissions } from "@/lib/server/state";
 
 export async function GET(req: NextRequest) {
   const blocked = requireCommissionerRequest(req, "staff");
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
 
   const search = req.nextUrl.searchParams.get("q")?.trim().toLowerCase() ?? "";
 
-  if (!isSupabaseConfigured()) return NextResponse.json({ submissions: [] });
+  if (!isSupabaseConfigured()) return NextResponse.json({ submissions: getPaymentSubmissions(search) });
 
   const rows = await supabaseAdminTable<any[]>("payment_submissions?select=user_id,status,utr,payer_name,screenshot_name,updated_at");
   const users = await supabaseAdminTable<any[]>("users?select=id,username,email").catch(() => []);
