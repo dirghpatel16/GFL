@@ -82,7 +82,7 @@ export default function StandingsPage() {
 
   return (
     <div className="py-8 space-y-4">
-      <h1 className="section-title">PlayGFL Season 2 Official Standings</h1>
+      <h1 className="section-title">GFL Season 2 Official Standings</h1>
       <p className="text-sm text-white/70">Premium leaderboard + full season spreadsheet-style ledger for all 30 matches.</p>
 
       <div className="flex gap-2 flex-wrap">

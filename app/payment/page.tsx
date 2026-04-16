@@ -70,7 +70,7 @@ export default function PaymentPage() {
 
   return (
     <div className="py-8 space-y-5">
-      <h1 className="section-title">PlayGFL Season 2 Entry Payment</h1>
+      <h1 className="section-title">GFL Season 2 Entry Payment</h1>
 
       <section className="card p-5 grid gap-5 lg:grid-cols-2">
         <div>
@@ -79,7 +79,7 @@ export default function PaymentPage() {
           <div className="mt-4 relative w-full max-w-sm aspect-square rounded-xl overflow-hidden border border-white/20">
             <Image
               src={process.env.NEXT_PUBLIC_PAYMENT_QR_URL || "/payment-qr.jpeg"}
-              alt="PlayGFL Season 2 payment QR code"
+              alt="GFL Season 2 payment QR code"
               fill
               sizes="(max-width: 640px) 90vw, 384px"
               className="object-contain"

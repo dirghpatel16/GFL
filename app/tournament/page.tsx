@@ -22,7 +22,7 @@ export default function TournamentPage() {
   return (
     <div className="py-8 space-y-6">
       <section className="card p-5">
-        <h1 className="section-title">PlayGFL Season 2 Tournament</h1>
+        <h1 className="section-title">GFL Season 2 Tournament</h1>
         <p className="mt-2 text-sm text-white/75">Entry Fee ₹{seasonConfig.entryFee} • Prize Pool ₹{seasonConfig.prizePool} • Timing {seasonConfig.timing}</p>
       </section>
 

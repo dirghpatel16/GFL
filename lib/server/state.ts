@@ -6,7 +6,7 @@ import { RoundType, seasonMatchPlan } from "@/lib/config/matchFormat";
 
 const tournament: Tournament = {
   id: "gfl-s1",
-  name: "PlayGFL Season 2",
+  name: "GFL Season 2",
   game: "BGMI",
   timezone: "Asia/Kolkata",
   launchAtIST: LAUNCH_UNLOCK_AT_IST,
