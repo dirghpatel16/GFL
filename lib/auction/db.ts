@@ -61,12 +61,43 @@ async function patchSession(sessionId: string, payload: Record<string, unknown>)
 }
 
 export async function runAuctionAction(action: AuctionAction, captainId?: string, manualPlayerId?: string) {
-  const session = await getActiveSession();
-  if (!session) throw new Error("No active auction session");
+  let session = await getActiveSession();
 
   if (action === "start") {
-    await patchSession(session.id, { state: "waiting", announcer_line: "Auction started. Ready for lot draw." });
+    if (!session) {
+      const rows = await supabaseAdminTable<any[]>("auction_sessions", {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify([{
+          tournament_id: "gfl-s2",
+          state: "waiting",
+          announcer_line: "Auction started. Ready for lot draw."
+        }])
+      });
+      session = rows[0];
+
+      // Automatically populate pool with all registered auction players
+      if (session) {
+        const players = await supabaseAdminTable<any[]>("auction_players?select=id");
+        if (players.length > 0) {
+          const poolInserts = players.map(p => ({
+            session_id: session!.id,
+            player_id: p.id,
+            is_available: true
+          }));
+          await supabaseAdminTable("auction_pool", {
+            method: "POST",
+            body: JSON.stringify(poolInserts)
+          }).catch(() => null);
+        }
+      }
+    } else {
+      await patchSession(session.id, { state: "waiting", announcer_line: "Auction started. Ready for lot draw." });
+    }
+    return;
   }
+
+  if (!session) throw new Error("No active auction session");
 
   if (action === "set_drawing") {
     await patchSession(session.id, { state: "drawing", announcer_line: "Next player entering the auction pool..." });

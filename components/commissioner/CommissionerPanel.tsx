@@ -201,8 +201,6 @@ export function CommissionerPanel() {
         <form className="space-y-2 border border-white/10 p-3" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); run("/api/players", "POST", Object.fromEntries(f.entries())); e.currentTarget.reset(); }}>
           <p className="text-sm font-semibold">Players</p>
           <input required name="name" className="w-full rounded bg-white/5 p-2" placeholder="Player name" />
-          <input required name="region" className="w-full rounded bg-white/5 p-2" placeholder="Region" />
-          <input required name="style" className="w-full rounded bg-white/5 p-2" placeholder="Play style" />
           <select required name="role" className="w-full rounded bg-white/5 p-2"><option>Assaulter</option><option>Support</option><option>IGL</option><option>Sniper</option><option>Flexible</option></select>
           <button className="cta-primary w-full">Add Player</button>
           <div className="space-y-1 max-h-40 overflow-auto">
@@ -214,7 +212,6 @@ export function CommissionerPanel() {
           <p className="text-sm font-semibold">Captains {isOwner ? "(Owner)" : "(Read-only remove)"}</p>
           <input required name="name" className="w-full rounded bg-white/5 p-2" placeholder="Captain name" />
           <input required name="tag" className="w-full rounded bg-white/5 p-2" placeholder="Tag" />
-          <input required name="region" className="w-full rounded bg-white/5 p-2" placeholder="Region" />
           <button className="cta-primary w-full">Add Captain</button>
           <div className="space-y-1 max-h-40 overflow-auto">
             {captains.map((c) => <div key={c.id} className="flex justify-between text-xs"><span>{c.name}</span>{isOwner && <button type="button" className="text-danger" onClick={() => run("/api/captains", "DELETE", { captainId: c.id })}>Remove</button>}</div>)}

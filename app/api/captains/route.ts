@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
 
   const name = asNonEmptyString(body.name);
   const tag = asNonEmptyString(body.tag);
-  const region = asNonEmptyString(body.region);
+  const region = asNonEmptyString(body.region) ?? "";
 
-  if (!name || !tag || !region) return badRequest("name, tag and region are required");
+  if (!name || !tag) return badRequest("name and tag are required");
 
   const purseValue = Number(body.pursePoints ?? 100);
   const pursePoints = Number.isFinite(purseValue) ? purseValue : 100;

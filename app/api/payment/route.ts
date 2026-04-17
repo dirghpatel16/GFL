@@ -135,5 +135,25 @@ export async function PATCH(req: NextRequest) {
     }])
   }).catch(() => []);
 
+  if (nextStatus === "confirmed") {
+    // Add player to auction_players pool
+    const profiles = await supabaseAdminTable<any[]>(`player_profiles?user_id=eq.${userId}&select=*`).catch(() => []);
+    if (profiles.length > 0) {
+      const p = profiles[0];
+      await supabaseAdminTable("auction_players", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify([{
+          id: p.user_id,
+          profile_user_id: p.user_id,
+          name: p.bgmi_ign || p.username || "Unknown",
+          role: p.role_preference || "Flexible",
+          region: "",
+          style: p.bgmi_id || ""
+        }])
+      }).catch(() => null);
+    }
+  }
+
   return NextResponse.json({ payment: { ...payment, label: label(payment.status) } });
 }
