@@ -31,6 +31,20 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const authUser = await getSessionUser();
   if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Ensure a row exists in public.users for this Clerk user (upsert is idempotent)
+  await supabaseAdminTable("users", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify([{
+      id: authUser.id,
+      username: authUser.username || authUser.id,
+      email: authUser.email || `${authUser.id}@clerk.local`,
+      email_verified: true,
+      role: "player"
+    }])
+  }).catch(() => null);
+
   const body = await parseJSON(req);
   if (!body) return badRequest("Invalid JSON body");
 

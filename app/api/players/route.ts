@@ -16,7 +16,7 @@ export async function GET() {
 
     const registeredIds = new Set(
       registrations
-        .filter((r) => ["profile_completed", "payment_submitted", "registered"].includes(String(r.status)))
+        .filter((r) => ["payment_submitted", "registered"].includes(String(r.status)))
         .map((r) => r.user_id)
     );
 

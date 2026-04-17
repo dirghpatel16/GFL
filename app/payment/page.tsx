@@ -4,6 +4,7 @@ import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import { fetchJSON } from "@/lib/services/http";
 import { seasonConfig } from "@/lib/config/season";
+import { ProfileEditor } from "@/components/profile/ProfileEditor";
 
 interface PaymentPayload {
   status: "unpaid" | "submitted" | "confirmed" | "rejected";
@@ -14,14 +15,22 @@ interface PaymentPayload {
 
 export default function PaymentPage() {
   const [payment, setPayment] = useState<PaymentPayload>({ status: "unpaid", label: "Unpaid" });
+  const [profileComplete, setProfileComplete] = useState(false);
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const load = () =>
-    fetchJSON<{ payment: PaymentPayload }>("/api/payment")
-      .then((d) => setPayment(d.payment ?? { status: "unpaid", label: "Unpaid" }))
-      .catch(() => null);
+  const load = () => {
+    setLoading(true);
+    Promise.all([
+      fetchJSON<{ profile: { completion_percent?: number } }>("/api/profile"),
+      fetchJSON<{ payment: PaymentPayload }>("/api/payment")
+    ]).then(([profileData, paymentData]) => {
+      setProfileComplete(profileData.profile?.completion_percent === 100);
+      setPayment(paymentData.payment ?? { status: "unpaid", label: "Unpaid" });
+    }).catch(() => null).finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     load();
@@ -31,7 +40,8 @@ export default function PaymentPage() {
     e.preventDefault();
     setMessage("");
 
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const screenshot = fd.get("screenshot") as File;
     if (!screenshot || !screenshot.name) {
       setMessage("Screenshot proof is required.");
@@ -58,7 +68,7 @@ export default function PaymentPage() {
       });
 
       setMessage("Payment submitted for verification. Your registration will be confirmed after payment verification.");
-      e.currentTarget.reset();
+      form.reset();
       setShowForm(false);
       load();
     } catch (error: any) {
@@ -68,9 +78,22 @@ export default function PaymentPage() {
     }
   };
 
+  if (loading) return <div className="py-10 text-center text-white/50">Loading...</div>;
+
+  if (!profileComplete) {
+    return (
+      <div className="py-8 space-y-5">
+        <h1 className="section-title text-neon">Step 1: Player Details Required</h1>
+        <p className="text-white/70">You must complete your BGMI details before proceeding to the entry payment.</p>
+        <ProfileEditor />
+        <button className="cta-primary mt-4" onClick={load}>I've completed my profile → Continue to Payment</button>
+      </div>
+    );
+  }
+
   return (
     <div className="py-8 space-y-5">
-      <h1 className="section-title">GFL Season 2 Entry Payment</h1>
+      <h1 className="section-title">Step 2: GFL Season 2 Entry Payment</h1>
 
       <section className="card p-5 grid gap-5 lg:grid-cols-2">
         <div>

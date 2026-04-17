@@ -21,8 +21,8 @@ export async function GET() {
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify([{
       id: authUser.id,
-      username: authUser.username ?? authUser.email?.split("@")[0] ?? authUser.id,
-      email: authUser.email ?? `${authUser.id}@clerk.local`,
+      username: authUser.username || authUser.id,
+      email: authUser.email || `${authUser.id}@clerk.local`,
       email_verified: true,
       role: "player"
     }])
@@ -94,6 +94,16 @@ export async function PUT(req: NextRequest) {
   const completion = completionPercent(next);
   const profilePayload = { ...next, completion_percent: completion, updated_at: new Date().toISOString() };
 
+  // Fetch existing registration to avoid overwriting payment status
+  const existingReg = await supabaseAdminTable<any[]>(`tournament_registrations?user_id=eq.${authUser.id}&select=*`).catch(() => []);
+  const regPayload = existingReg.length > 0 ? existingReg[0] : {
+    user_id: authUser.id,
+    tournament_id: "gfl-s2",
+    status: "profile_completed",
+    payment_status: "unpaid",
+    updated_at: new Date().toISOString()
+  };
+
   const [updated] = await Promise.all([
     supabaseAdminTable<any[]>("player_profiles", {
       method: "POST",
@@ -103,13 +113,7 @@ export async function PUT(req: NextRequest) {
     supabaseAdminTable<any[]>("tournament_registrations", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify([{
-        user_id: authUser.id,
-        tournament_id: "gfl-s2",
-        status: "profile_completed",
-        payment_status: "unpaid",
-        updated_at: new Date().toISOString()
-      }])
+      body: JSON.stringify([{ ...regPayload, updated_at: new Date().toISOString() }])
     }).catch(() => [])
   ]);
 
