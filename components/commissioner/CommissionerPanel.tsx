@@ -73,31 +73,6 @@ export function CommissionerPanel() {
     loadPayments();
   }, [enabled, search]);
 
-  useEffect(() => {
-    fetchJSON<{ matchLedger: ExistingMatchLedger[] }>("/api/standings")
-      .then((d) => setMatchLedger(d.matchLedger ?? []))
-      .catch(() => setMatchLedger([]));
-  }, [enabled]);
-
-  useEffect(() => {
-    const existing = matchLedger.find((entry) => entry.matchNumber === matchNumber);
-    if (existing) {
-      setRoundType(existing.roundType);
-      setMapName(existing.map);
-      setResultRows(teams.map((team, index) => {
-        const row = existing.entries.find((entry) => entry.teamId === team.id);
-        return row ?? { teamId: team.id, placement: index + 1, kills: 0, bonusType: "none", nominatedPlayerKills: 0 };
-      }));
-      return;
-    }
-
-    if (selectedMatch) {
-      setRoundType(selectedMatch.roundType);
-      setMapName(selectedMatch.map);
-    }
-    setResultRows(teams.map((team, index) => ({ teamId: team.id, placement: index + 1, kills: 0, bonusType: "none", nominatedPlayerKills: 0 })));
-  }, [matchNumber, selectedMatch, teams, matchLedger]);
-
   const unlock = async (e: FormEvent) => {
     e.preventDefault();
     await fetchJSON("/api/commissioner/session", { method: "POST", body: JSON.stringify({ passcode, role }) });
