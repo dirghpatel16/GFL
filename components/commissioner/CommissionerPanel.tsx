@@ -43,6 +43,7 @@ export function CommissionerPanel() {
   // Block scoring state
   const [activeBlock, setActiveBlock] = useState(1);
   const [blockScores, setBlockScores] = useState<Record<string, Record<number, number>>>({}); // teamId -> { roundIndex: score }
+  const [loadingScores, setLoadingScores] = useState(false);
 
   const isOwner = enabled && role === "owner";
 
@@ -105,6 +106,7 @@ export function CommissionerPanel() {
 
   const submitBlockScores = async (e: FormEvent) => {
     e.preventDefault();
+    setLoadingScores(true);
     const blockMatches = seasonMatchPlan.filter(m => m.block === activeBlock);
     
     // Save each round in the block
@@ -126,6 +128,7 @@ export function CommissionerPanel() {
       });
     }
     
+    setLoadingScores(false);
     setMessage(`Block ${activeBlock} scores saved! Standings recalculated.`);
   };
 
