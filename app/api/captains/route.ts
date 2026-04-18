@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
   const name = asNonEmptyString(body.name);
   const tag = asNonEmptyString(body.tag);
   const region = asNonEmptyString(body.region) ?? "";
+  const userId = asNonEmptyString(body.user_id) ?? null;
 
   if (!name || !tag) return badRequest("name and tag are required");
 
@@ -30,10 +31,16 @@ export async function POST(req: NextRequest) {
   const pursePoints = Number.isFinite(purseValue) ? purseValue : 100;
 
   if (isSupabaseConfigured()) {
+    const captainId = crypto.randomUUID();
     const created = await supabaseAdminTable<any[]>("captains", {
       method: "POST",
-      body: JSON.stringify([{ id: crypto.randomUUID(), name, tag, region, purse_points: pursePoints }])
+      body: JSON.stringify([{ id: captainId, user_id: userId, name, tag, region, purse_points: pursePoints }])
     });
+    // Create an associated team for the captain automatically
+    await supabaseAdminTable("teams", {
+      method: "POST",
+      body: JSON.stringify([{ id: crypto.randomUUID(), tournament_id: "gfl-s2", name: `Team ${tag}`, captain_id: captainId }])
+    }).catch(() => null);
     return NextResponse.json(created[0], { status: 201 });
   }
 

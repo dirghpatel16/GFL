@@ -21,16 +21,17 @@ export async function POST(req: NextRequest) {
   }
   if (!entries.length) return badRequest("entries are required");
 
-  const normalizedEntries: TeamMatchResultInput[] = [];
+  const normalizedEntries: any[] = [];
   for (const entry of entries) {
     const teamId = asNonEmptyString(entry?.teamId);
-    const placement = Number(entry?.placement);
+    const placement = Number(entry?.placement ?? 0);
     const kills = Number(entry?.kills ?? 0);
     const bonusType = asNonEmptyString(entry?.bonusType) ?? "none";
     const nominatedPlayerKills = Number(entry?.nominatedPlayerKills ?? 0);
+    const totalPointsOverride = entry?.points !== undefined ? Number(entry.points) : undefined;
 
-    if (!teamId || !Number.isFinite(placement) || !Number.isFinite(kills)) continue;
-    normalizedEntries.push({ teamId, placement, kills, bonusType: bonusType as any, nominatedPlayerKills });
+    if (!teamId) continue;
+    normalizedEntries.push({ teamId, placement, kills, bonusType, nominatedPlayerKills, totalPointsOverride });
   }
 
   if (!normalizedEntries.length) return badRequest("valid team entries are required");
@@ -47,7 +48,8 @@ export async function POST(req: NextRequest) {
       kills: entry.kills,
       bonus_type: entry.bonusType,
       nominated_player_kills: entry.nominatedPlayerKills,
-      is_golden_round: roundType === "golden"
+      is_golden_round: roundType === "golden",
+      total_points: entry.totalPointsOverride !== undefined ? entry.totalPointsOverride : 0
     }));
 
     const created = await supabaseAdminTable<any[]>("match_results", {

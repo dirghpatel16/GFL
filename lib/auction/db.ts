@@ -117,12 +117,26 @@ export async function getAuctionSnapshot() {
     }
   }
 
-  const [pool, teams, rounds, captains] = await Promise.all([
+  const [pool, teams, rounds, captains, allPlayers] = await Promise.all([
     supabaseAdminTable<PoolRow[]>(`auction_pool?session_id=eq.${session.id}&select=player_id,is_available,draw_order,auction_players(id,name,role,region,style,sold_to_captain_id)&order=draw_order.asc.nullslast`),
     supabaseAdminTable<any[]>(`teams?tournament_id=eq.${session.tournament_id}&select=id,name,captain_id,team_players(player_id)`),
     supabaseAdminTable<any[]>(`auction_rounds?session_id=eq.${session.id}&select=id,player_id,captain_id,state,created_at,auction_players(name)&order=created_at.desc`),
-    supabaseAdminTable<any[]>("captains?select=id,name,tag,purse_points")
+    supabaseAdminTable<any[]>("captains?select=id,name,tag,purse_points"),
+    supabaseAdminTable<any[]>("auction_players?select=id")
   ]);
+
+  // Auto-sync any new registered players into the auction pool
+  const existingPlayerIds = new Set(pool.map(p => p.player_id));
+  const newPlayers = allPlayers.filter(p => !existingPlayerIds.has(p.id));
+  if (newPlayers.length > 0) {
+    await supabaseAdminTable("auction_pool", {
+      method: "POST",
+      body: JSON.stringify(newPlayers.map(p => ({ session_id: session!.id, player_id: p.id, is_available: true })))
+    }).catch(() => null);
+    // Refresh pool to include newly inserted
+    const newPoolData = await supabaseAdminTable<PoolRow[]>(`auction_pool?session_id=eq.${session.id}&select=player_id,is_available,draw_order,auction_players(id,name,role,region,style,sold_to_captain_id)&order=draw_order.asc.nullslast`);
+    pool.splice(0, pool.length, ...newPoolData);
+  }
 
   const currentPlayer = pool.find((p) => p.player_id === session.current_player_id)?.auction_players;
 

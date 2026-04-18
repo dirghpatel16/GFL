@@ -25,22 +25,9 @@ interface Submission {
 }
 type Role = "owner" | "staff";
 
-type BonusType = "none" | "back_to_back" | "threepeat";
-
-interface ResultRowInput {
-  teamId: string;
-  placement: number;
-  kills: number;
-  bonusType: BonusType;
-  nominatedPlayerKills: number;
-}
-
-interface ExistingMatchLedger {
-  matchNumber: number;
-  roundType: "normal" | "golden";
-  map: string;
-  entries: ResultRowInput[];
-}
+// Score Grid Types
+interface MatchScore { teamId: string; points: number }
+interface BlockScores { [matchNumber: number]: MatchScore[] }
 
 export function CommissionerPanel() {
   const [enabled, setEnabled] = useState(false);
@@ -52,14 +39,12 @@ export function CommissionerPanel() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [search, setSearch] = useState("");
-  const [matchNumber, setMatchNumber] = useState(1);
-  const [roundType, setRoundType] = useState<"normal" | "golden">("normal");
-  const [mapName, setMapName] = useState("");
-  const [resultRows, setResultRows] = useState<ResultRowInput[]>([]);
-  const [matchLedger, setMatchLedger] = useState<ExistingMatchLedger[]>([]);
+
+  // Block scoring state
+  const [activeBlock, setActiveBlock] = useState(1);
+  const [blockScores, setBlockScores] = useState<Record<string, Record<number, number>>>({}); // teamId -> { roundIndex: score }
 
   const isOwner = enabled && role === "owner";
-  const selectedMatch = seasonMatchPlan.find((m) => m.matchNumber === matchNumber);
 
   const loadCore = () => {
     fetchJSON<{ enabled: boolean; role: Role | null }>("/api/commissioner/session")
@@ -83,10 +68,6 @@ export function CommissionerPanel() {
   useEffect(() => {
     loadCore();
   }, []);
-
-  useEffect(() => {
-    setResultRows(teams.map((team, index) => ({ teamId: team.id, placement: index + 1, kills: 0, bonusType: "none", nominatedPlayerKills: 0 })));
-  }, [teams]);
 
   useEffect(() => {
     loadPayments();
@@ -140,43 +121,54 @@ export function CommissionerPanel() {
     loadPayments();
   };
 
-  const updateResultRow = (teamId: string, patch: Partial<ResultRowInput>) => {
-    setResultRows((prev) => prev.map((row) => (row.teamId === teamId ? { ...row, ...patch } : row)));
+  const updateBlockScore = (teamId: string, roundIndex: number, score: number) => {
+    setBlockScores(prev => ({
+      ...prev,
+      [teamId]: { ...(prev[teamId] || {}), [roundIndex]: score }
+    }));
   };
 
-  const submitMatchResults = async (e: FormEvent) => {
+  const submitBlockScores = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedMatch) return;
-    await fetchJSON("/api/results", {
-      method: "POST",
-      body: JSON.stringify({
-        matchNumber,
-        roundType,
-        map: mapName || selectedMatch?.map || "Unknown",
-        entries: resultRows
-      })
-    });
-    setMessage(`Saved Match ${matchNumber} (${roundType.toUpperCase()}) and updated standings.`);
+    const blockMatches = seasonMatchPlan.filter(m => m.block === activeBlock);
+    
+    // Save each round in the block
+    for (let i = 0; i < blockMatches.length; i++) {
+      const match = blockMatches[i];
+      const entries = teams.map(team => ({
+        teamId: team.id,
+        points: blockScores[team.id]?.[i] ?? 0
+      }));
+
+      await fetchJSON("/api/results", {
+        method: "POST",
+        body: JSON.stringify({
+          matchNumber: match.matchNumber,
+          roundType: match.roundType,
+          map: match.map,
+          entries
+        })
+      });
+    }
+    
+    setMessage(`Block ${activeBlock} scores saved! Standings recalculated.`);
   };
 
-  const ownerCapabilities = useMemo(() => [
-    "Verify/reject payments",
-    "Add/remove captains",
-    "Rename teams",
-    "Manage auction pool",
-    "Edit results & standings",
-    "Owner reset controls"
-  ], []);
+  const confirmPayment = async (userId: string) => {
+    await fetchJSON("/api/payment", "PATCH", { userId, action: "confirm" });
+    setMessage("Payment confirmed.");
+  };
 
-  const staffCapabilities = useMemo(() => [
-    "Verify/reject payments",
-    "Run auction operations",
-    "Add/edit players",
-    "Enter results and update standings"
-  ], []);
+  const rejectPayment = async (userId: string) => {
+    await fetchJSON("/api/payment", "PATCH", { userId, action: "reject" });
+    setMessage("Payment rejected.");
+  };
+
+  const ownerCapabilities = ["Verify/reject payments", "Add/remove captains", "Rename teams", "Manage auction pool", "Edit results & standings", "Owner reset controls"];
+  const staffCapabilities = ["View payments", "Add/remove players", "Run auction session", "Input results"];
 
   return (
-    <section className="card p-4 space-y-4">
+    <section className="space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-bold">Commissioner Mode</h2>
@@ -204,7 +196,23 @@ export function CommissionerPanel() {
           <select required name="role" className="w-full rounded bg-white/5 p-2"><option>Assaulter</option><option>Support</option><option>IGL</option><option>Sniper</option><option>Flexible</option></select>
           <button className="cta-primary w-full">Add Player</button>
           <div className="space-y-1 max-h-40 overflow-auto">
-            {players.map((p) => <div key={p.id} className="flex justify-between text-xs"><span>{p.name}</span><button type="button" className="text-danger" onClick={() => run("/api/players", "DELETE", { playerId: p.id })}>Remove</button></div>)}
+            {players.map((p) => (
+              <div key={p.id} className="flex justify-between items-center text-xs border-b border-white/5 pb-1">
+                <span>{p.name}</span>
+                <div className="flex gap-2">
+                  {captains.length < 3 && (
+                    <button type="button" className="text-neon" onClick={() => {
+                      const tag = prompt(`Enter team tag for Captain ${p.name}:`);
+                      if (tag) {
+                        run("/api/captains", "POST", { name: p.name, tag, user_id: p.id })
+                          .then(() => run("/api/players", "DELETE", { playerId: p.id }));
+                      }
+                    }}>Make Capt.</button>
+                  )}
+                  <button type="button" className="text-danger" onClick={() => run("/api/players", "DELETE", { playerId: p.id })}>Remove</button>
+                </div>
+              </div>
+            ))}
           </div>
         </form>
 
@@ -249,32 +257,57 @@ export function CommissionerPanel() {
           ))}
         </div>
 
-        <form className="space-y-2 border border-white/10 p-3" onSubmit={submitMatchResults}>
-          <p className="text-sm font-semibold">Results Entry & Standings Update</p>
-          <select value={matchNumber} onChange={(e) => setMatchNumber(Number(e.target.value))} className="w-full rounded bg-white/5 p-2">
-            {seasonMatchPlan.map((m) => <option key={m.matchNumber} value={m.matchNumber}>Match {m.matchNumber} • Block {m.block} • {m.roundType === "golden" ? "Golden" : "Normal"}</option>)}
-          </select>
-          <div className="grid grid-cols-2 gap-2">
-            <select value={roundType} onChange={(e) => setRoundType(e.target.value as "normal" | "golden")} className="rounded bg-white/5 p-2 text-xs">
-              <option value="normal">Normal</option>
-              <option value="golden">Golden</option>
+        <form className="space-y-2 border border-white/10 p-3 lg:col-span-2" onSubmit={submitBlockScores}>
+          <div className="flex justify-between items-center mb-2">
+            <p className="text-sm font-semibold">Results Entry (By Block)</p>
+            <select value={activeBlock} onChange={(e) => setActiveBlock(Number(e.target.value))} className="rounded bg-white/5 p-1 text-xs">
+              {[1, 2, 3, 4, 5, 6].map(b => <option key={b} value={b}>Block {b}</option>)}
             </select>
-            <input value={mapName} onChange={(e) => setMapName(e.target.value)} className="rounded bg-white/5 p-2 text-xs" placeholder="Map" />
           </div>
-          <div className="space-y-2 max-h-64 overflow-auto">
-            {resultRows.map((row) => (
-              <div key={row.teamId} className="rounded border border-white/10 p-2 grid grid-cols-2 gap-2 text-xs">
-                <p className="col-span-2 font-semibold">{teams.find((t) => t.id === row.teamId)?.name || row.teamId}</p>
-                <input type="number" min={1} max={99} value={row.placement} onChange={(e) => updateResultRow(row.teamId, { placement: Number(e.target.value) })} className="rounded bg-white/5 p-2" placeholder="Placement" />
-                <input type="number" min={0} value={row.kills} onChange={(e) => updateResultRow(row.teamId, { kills: Number(e.target.value) })} className="rounded bg-white/5 p-2" placeholder="Kills" />
-                <select value={row.bonusType} onChange={(e) => updateResultRow(row.teamId, { bonusType: e.target.value as BonusType })} className="rounded bg-white/5 p-2">
-                  <option value="none">No bonus</option><option value="back_to_back">Back-to-back</option><option value="threepeat">Three back-to-back</option>
-                </select>
-                <input type="number" min={0} value={row.nominatedPlayerKills} onChange={(e) => updateResultRow(row.teamId, { nominatedPlayerKills: Number(e.target.value) })} className="rounded bg-white/5 p-2" placeholder="Nominated x2 kills" disabled={roundType !== "golden"} />
-              </div>
-            ))}
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left min-w-[600px]">
+              <thead>
+                <tr className="border-b border-white/20">
+                  <th className="py-2 px-2 font-bold w-32">Team</th>
+                  {seasonMatchPlan.filter(m => m.block === activeBlock).map((m, i) => (
+                    <th key={m.matchNumber} className="py-2 px-1 text-center font-bold">
+                      Round {i + 1}
+                      <div className="text-[10px] text-white/50 font-normal">{m.roundType === "golden" ? "Golden" : "Normal"}</div>
+                    </th>
+                  ))}
+                  <th className="py-2 px-2 text-center font-bold text-neon">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {teams.map(team => {
+                  const rounds = seasonMatchPlan.filter(m => m.block === activeBlock);
+                  const teamScores = blockScores[team.id] || {};
+                  const total = rounds.reduce((sum, _, i) => sum + (teamScores[i] || 0), 0);
+                  
+                  return (
+                    <tr key={team.id}>
+                      <td className="py-2 px-2 font-semibold truncate">{team.name}</td>
+                      {rounds.map((_, i) => (
+                        <td key={i} className="py-2 px-1">
+                          <input 
+                            type="number" 
+                            className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-center" 
+                            value={teamScores[i] === undefined ? "" : teamScores[i]} 
+                            onChange={(e) => updateBlockScore(team.id, i, parseInt(e.target.value) || 0)}
+                          />
+                        </td>
+                      ))}
+                      <td className="py-2 px-2 text-center font-bold text-neon">{total}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <button className="cta-primary w-full">Save Match & Recalculate Standings</button>
+          <button className="cta-primary w-full mt-4" disabled={loadingScores}>
+            {loadingScores ? "Loading..." : `Save Block ${activeBlock} Scores & Recalculate Standings`}
+          </button>
         </form>
 
         <div className="space-y-2 border border-white/10 p-3 lg:col-span-2">
@@ -292,8 +325,8 @@ export function CommissionerPanel() {
                 <p>Screenshot: {s.screenshot_name || "-"}</p>
                 {s.screenshot_data_url && <img src={s.screenshot_data_url} alt="Payment proof" className="h-28 w-full object-contain rounded border border-white/10" />}
                 <div className="mt-1 flex gap-2">
-                  <button type="button" className="text-neon" onClick={() => run("/api/payment", "PATCH", { userId: s.user_id, action: "confirm" })}>Payment Confirmed</button>
-                  <button type="button" className="text-danger" onClick={() => run("/api/payment", "PATCH", { userId: s.user_id, action: "reject" })}>Rejected</button>
+                  <button type="button" className="text-neon" onClick={() => confirmPayment(s.user_id)}>Payment Confirmed</button>
+                  <button type="button" className="text-danger" onClick={() => rejectPayment(s.user_id)}>Rejected</button>
                 </div>
                 {!!s.history?.length && <div className="rounded bg-white/5 p-1">{s.history.map((h) => <p key={h.id}>{h.at}: {h.note}</p>)}</div>}
               </div>
